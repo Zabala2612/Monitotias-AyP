@@ -1,0 +1,396 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Jan  3 14:39:01 2025
+Trabajo Final Programación 2025-1
+Parqueadero, generar pago y factura
+@author: JulianCastillo
+"""
+# =============================================================================
+# REGION: Configuración Impresión con Rich
+# =============================================================================
+from rich.console import Console
+from rich.theme import Theme
+from rich.progress import Progress
+Parking = Theme({
+    "titulo": "bold dark_blue",
+    "alerta": "dark_orange",
+    "ok": "bold dark_green",
+    "error": "bold red",
+    "normalb": "bold black",
+    "normal": "black"
+}, inherit=False)
+console = Console(theme=Parking)
+
+# =============================================================================
+# REGION: Librerías
+# =============================================================================
+with console.status("Cargando Librerías", spinner="clock"):
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import statistics as st
+    import math as mt
+    from datetime import datetime
+    from pytz import timezone
+    from tqdm import tqdm
+    import time
+    import os
+    #import ace_tools as tools
+    inicio = time.time()
+    import warnings
+    # Ignorar todos los warnings
+    warnings.filterwarnings("ignore")
+    import random as rnd
+    import getpass
+    from faker import Faker
+    fake = Faker('es_ES')
+console.print("Librerías cargadas satisfactoriamente", style="normalb")
+# =============================================================================
+# REGION: Variables
+# =============================================================================
+dicUsuarios = {
+    'Nombre': [],
+    'Apellido': [],
+    'Documento': [],
+    'Placa': []
+}
+
+dicRegistro = {} 
+
+dicHistorico = {
+    'Placa': [],
+    'Documento': [],
+    'FechaRegistro': [],
+    'TiempoEnParqueadero':[]    
+    }
+
+dicAdministradores = {
+    '123456789': 'Empanada',
+    '987654321': 'Goku'
+}
+lstErrores = []
+bogota_timezone = timezone('America/Bogota')
+nombreparq = "Insertar Nombre Del Parqueadero"
+logo = """
+                                _______
+                               /|_||_\\`.__
+                              (   _    _ _|
+                              =`-(_)--(_)-'
+"""
+# =============================================================================
+# REGION: Funciones
+# =============================================================================
+def ImprimirMenu():
+    """
+    Imprime el menú principal del sistema de estacionamiento "Insertar Nombre del Parqueadero".
+
+    Esta función crea una lista de cadenas con las opciones del menú y las imprime 
+    en la consola, formateadas y centradas. 
+
+    Returns:
+        None: La función no devuelve ningún valor, solo imprime el menú.
+    """
+
+    lineas = []
+    lineas.append(logo)
+    lineas.append('Bienvenido al Parqueadero "Insertar Nombre Del Parqueadero"')
+    lineas.append('\t1. Registrar Usuario')
+    lineas.append('\t2. Ingresar Vehiculo')
+    lineas.append('\t3. Retirar Vehiculo')
+    lineas.append('\t4. Administrador')
+    lineas.append('\t5. Salir')
+    for linea in lineas:
+        console.print(linea.center(80), style="titulo")
+    return None
+
+def ValidarOpcion(opcion:str) -> int:
+    """
+    Valida si la opción ingresada es una de las opciones permitidas y retorna su valor numérico.
+
+    La función verifica si la opción es una de las permitidas ('1' a '5'). Si la opción es válida, retorna su valor entero.
+    En caso contrario, retorna 0. También retorna 0 si la opción incluye '0' o si su longitud es diferente de 1.
+
+    Parameters:
+        opcion (str): La opción ingresada por el usuario, que deberá ser un número entre '1' y '5' como cadena.
+
+    Returns:
+        int: El valor entero de la opción si es válida; 0 en caso contrario.
+    """
+    opcion = str(opcion)
+    opciones = ['1','2','3','4','5']
+    if len(opcion) != 1:
+        return 0
+    else:
+        if '0' in opcion:
+            return 0
+        elif len(opcion)==1:
+            if opcion in opciones:
+                return int(opcion)
+            else:
+                return 0
+        else:
+            return 0
+
+def ValidarNombre(nombre:str):
+    """
+    Valida si el nombre ingresado es válido.
+
+    Un nombre válido debe tener más de dos caracteres y contener únicamente letras. Si el nombre no cumple
+    con estos criterios, se agrega un mensaje de error a la lista proporcionada y se retorna False.
+
+    Args:
+        nombre (str): El nombre a validar.
+
+    Returns:
+        bool: True si el nombre es válido, False en caso contrario.
+    """
+    nombre = str(nombre)
+    if len(nombre) > 2:
+        if nombre.isalpha():
+            return True
+        else:
+            lstErrores.append("Error, Nombre no contiene letras")
+            return False
+    else:
+        lstErrores.append("Error, Nombre muy corto")
+        return False
+
+
+def ValidarApellido(apellido: str) -> bool:
+    """
+    Valida si el apellido ingresado es válido.
+
+    Un apellido válido debe tener más de dos caracteres y contener únicamente letras. Si el apellido no cumple
+    con estos requisitos, se agrega un mensaje de error a la lista proporcionada y se retorna False.
+
+    Args:
+        apellido (str): El apellido a validar.
+    
+    Returns:
+        bool: True si el apellido es válido, False en caso contrario.
+    """
+    apellido = str(apellido)
+    if len(apellido) > 2:
+        if apellido.isalpha():
+            return True
+        else:
+            lstErrores.append("Error, Apellido no contiene letras")
+            return False
+    else:
+        lstErrores.append("Error, Apellido muy corto")
+        return False
+        
+def ValidarDocumento(documento:str):
+    """
+    Valida si el documento ingresado es válido.
+
+    Un documento válido debe tener más de tres caracteres y contener únicamente dígitos. Si el documento no cumple
+    con estos criterios, se agrega un mensaje de error a la lista proporcionada y se retorna False.
+
+    Args:
+        documento (str): El documento a validar.
+    
+    Returns:
+        bool: True si el documento es válido, False en caso contrario.
+    """
+    documento = str(documento)
+    if len(documento) > 3:
+        if documento.isnumeric():
+            return True
+        else:
+            lstErrores.append("Error, Documento contiene letras")
+            return False
+    else:
+        lstErrores.append("Error, Documento contiene pocos digitos")
+        return False
+
+def ValidarPlaca(placa:str):
+    """
+    Valida si la placa ingresada es válida según el formato esperado.
+
+    Una placa válida debe tener exactamente 6 caracteres, donde los primeros tres deben ser letras y los últimos tres dígitos.
+    Si la placa no cumple con estos requisitos, se agrega un mensaje de error a la lista proporcionada y se retorna False.
+
+    Args:
+        placa (str): La placa de vehículo a validar.
+    
+    Returns:
+        bool: True si la placa es válida, False en caso contrario.
+    """
+    placa = str(placa)
+    if len(placa) == 6:
+        letras = placa[:3]
+        numeros = placa[3:]
+        if letras.isalpha():
+            if numeros.isnumeric():
+                #Placa esta ok
+                return True
+            else:
+                lstErrores.append('Error, digitos numericos de la placa se encuentran incorrectos')
+                return False                
+        else:
+            lstErrores.append('Error, letras de la placa se encuentran incorrectos')
+            return False            
+    else:
+        lstErrores.append("Error, Longitud de placa es incorrecta")
+        return False        
+        
+def ImprimirErrores(lstErrores:list):
+    """
+    Imprime los errores acumulados en la lista de errores usando estilos específicos.
+
+    Si la lista de errores no está vacía, imprime cada error en un formato estilizado. En caso contrario, imprime
+    un mensaje general de error indeterminado y proporciona información de contacto para soporte.
+
+    Args:
+        lstErrores (list): Lista que contiene mensajes de error a imprimir.
+    
+    Returns:
+        None
+    """
+    if lstErrores:
+        for e in lstErrores:
+            console.print('Los datos ingresados se encuentran incorrectos.', style='error')
+            console.print('Favor validar los siguentes datos y volver a intentarlo.', style='error')
+            console.print('\t'+e, style='error')
+    else:
+        console.print('Hay un error indeterminado,', style='alerta')
+        console.print('favor contactar con el Creador --> Castillo Enterprises', style='alerta')
+        console.print('Enviar un correo a: --> jandres.castillo@udea.edu.co', style='alerta')
+    return None
+    
+def CalculoPago(tiemposegundos:float, valorhora=7000, valorcuarto=1500):
+    horas = round(tiemposegundos/3600,0)
+    minutos = round(tiemposegundos % 3600, 0)
+    cuartos = int(minutos/900)+1
+    cobrohora = horas*valorhora
+    cobrocuarto = cuartos*valorcuarto
+    total = cobrohora+cobrocuarto
+    if total < valorhora:
+        return valorhora, horas, cuartos
+    else:
+        return total, horas, cuartos
+
+def ImprimirFactura(nombre:str, apellido:str, documento:str, placa:str, valortotal:int,  horas, fracciones, ancho=80):
+    miti = int(ancho/2)
+    lineapunto = '-:'*miti
+    linea = '-'*ancho
+    overline = '¯'*(ancho)
+    print(linea)
+    saludo = 'Bienvenidos'
+    console.print(saludo.center(80), style='titulo')
+    parqueadero = 'Parqueadero Insertar Nombre del Parqueadero'
+    console.print(parqueadero.center(80), style='titulo')
+    nit = '123.666.000-9'
+    console.print(nit.center(80), style='titulo')
+    fecha = datetime.now(bogota_timezone)
+    fecha_formateada = fecha.strftime("%Y-%m-%d")
+    console.print(fecha_formateada.center(80), style='titulo')
+    print(linea)
+    print(overline)
+    console.print(fecha_formateada.center(80), style='titulo')
+    console.print(f'Usuario: {nombre} {apellido} | Placa: {placa}'.center(80), style='titulo')
+    print(linea)
+    print(overline)
+    console.print('Placa'.center(20), 'Horas, Fracciones'.center(30), 'Valor a Pagar'.rjust(29), sep='', style='alerta')
+    print(linea)
+    print(overline) 
+    console.print(placa.center(20), f'Horas:{horas}, Fracciones:{fracciones}'.center(30), f'$ {valortotal:,.0f}'.rjust(29), sep='', style='normalb')
+    print(linea)
+    print(overline)
+    console.print('Gracias por Preferirnos'.center(80), style='titulo')
+    console.print('Vuelva Pronto'.center(80), style='titulo')
+    console.print('Desarrollado por CastilloEnterprises 🏯'.center(80), style='titulo')
+    print(linea)
+    return None
+# =============================================================================
+# REGION: Programa Parqueadero
+# =============================================================================
+
+while True:
+    """
+    'Bienvenido al Parqueadero "Insertar Nombre Del Parqueadero"'
+    1. Registrar Usuario'
+    2. Ingresar Vehiculo'
+    3. Retirar Vehiculo'
+    4. Administrador'
+    5. Salir'
+    """
+    lstErrores = [] # Los errores se deben reiniciar
+    print('*'*80)
+    ImprimirMenu()
+    console.print('Ingresar la opción', style='titulo')
+    opcion = input('---> ')
+    opcion = ValidarOpcion(opcion)
+    match opcion:
+        case 1:
+            console.print('1. Registrar Usuario', style="titulo")
+            console.print('A continuación solicitaremos el nombre, apellido, documento y placa.', style="normalb")
+            nombre = input('Ingresar el Nombre-->')
+            apellido = input('Ingresar el Apellido-->')
+            documento = input('Ingresar el Documento-->')
+            placa = input('Ingresar el Placa-->')
+            if ValidarNombre(nombre) and ValidarApellido(apellido) and ValidarDocumento(documento) and ValidarPlaca(placa):
+                dicUsuarios['Nombre'].append(nombre)
+                dicUsuarios['Apellido'].append(apellido)
+                dicUsuarios['Documento'].append(documento)
+                dicUsuarios['Placa'].append(placa)
+                console.print('Datos ingresados correctamente', style='ok')
+            else:
+                ImprimirErrores(lstErrores)
+        case 2:
+            console.print('2. Ingresar Vehiculo', style="titulo")
+            console.print('A continuación solicitaremos el documento y la placa del vehiculo', style="normalb")
+            documento = input('Ingresar el Documento-->')
+            placa = input('Ingresar el Placa-->')
+            if ValidarDocumento(documento) and ValidarPlaca(placa):
+                if documento in dicUsuarios['Documento']:
+                    tiempoinicial = round(time.time(),0)
+                    hora = datetime.now(bogota_timezone)
+                    hora_formateada = hora.strftime("%I:%M:%S %p")
+                    fecha = datetime.now(bogota_timezone)
+                    fecha_formateada = fecha.strftime("%Y-%m-%d")
+                    dicRegistro[placa] = {'Placa': placa,
+                                   'Documento': documento,
+                                   'TiempoIngreso': tiempoinicial,
+                                   'FechaIngreso': fecha_formateada,
+                                   'TiempoSalida': 0}
+                    console.print(f'Vehiculo de placas {placa} ingresado correctamente a las {hora_formateada} el día {fecha_formateada}', style='ok')
+                else:
+                    console.print(f'El vehiculo de placas {placa} no se encuentra registrado', style='error')
+                    console.print('Usando la opción 1, registra el vehiculo y vuelve por acá', style='error')
+            else:
+                ImprimirErrores(lstErrores)
+                
+        case 3:
+            console.print('3. Retirar Vehiculo', style="titulo")
+            console.print('A continuación solicitaremos el documento y la placa del vehiculo', style="normalb")
+            documento = input('Ingresar el Documento-->')
+            placa = input('Ingresar el Placa-->')
+            if ValidarDocumento(documento) and ValidarPlaca(placa):
+                if placa in list(dicRegistro.keys()):
+                    dicRegistro['abc123']['TiempoSalida'] = round(time.time(),0)
+                    diferencia = dicRegistro['abc123']['TiempoSalida'] - dicRegistro['abc123']['TiempoIngreso']
+                    cobro, horas, cuartos = CalculoPago(diferencia)
+                    ImprimirFactura(dicUsuarios['Nombre'][dicUsuarios['Documento'].index(documento)],
+                                    dicUsuarios['Apellido'][dicUsuarios['Documento'].index(documento)],
+                                    documento, placa, cobro, horas, cuartos)
+                else:
+                    console.print(f'El vehiculo de placas {placa} no se encuentra registrado', style='error')
+                    console.print('Usando la opción 1, registra el vehiculo y vuelve por acá', style='error')
+        case 4:
+            console.print('4. Modulo Administrador', style="titulo")
+            console.print('A continuación solicitaremos el documento y contraseña', style="normalb")
+            documento = input('Ingresar el Documento-->')
+            contrasenia = getpass.getpass("Ingresa tu contraseña: ")
+            if contrasenia == dicAdministradores[documento]:
+                console.print('Bienvenido Administrador', style='ok')
+            else:
+                console.print('Documento o constraseña incorrectos', style='error')
+                console.print('Hasta pronto', style='error')
+        case 5:
+            break
+        case _:
+            console.print('Opcion Invalida 🚫\nFavor Revisar', style="error")
+    print('*'*80)
+console.print(f'Fin. gracias por usar el parqueadero {nombreparq}', style="normalb")
